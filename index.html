@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Simply Snap">
+<meta name="description" content="Simply Snap — a fun, simple photo booth web app">
+<title>SIMPLY SNAP — Photo Booth</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     SCREEN 1: WELCOME
+══════════════════════════════════════ -->
+<div id="screen-welcome" class="screen active">
+  <div class="welcome-glow"></div>
+  <div class="film-lines"></div>
+  <div class="welcome-inner">
+    <div class="logo-name">SIMPLY SNAP</div>
+    <div class="logo-sub">Simple. Fun. Photos.</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <button class="btn-start" onclick="goTo('screen-setup')">START SESSION</button>
+      <div class="touch-hint">TOUCH TO BEGIN ↑</div>
+    </div>
+  </div>
+  <footer class="site-footer">Made with ❤️ by mko.</footer>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 2: SETUP
+══════════════════════════════════════ -->
+<div id="screen-setup" class="screen">
+  <div class="top-bar">
+    <div class="top-bar-logo">SIMPLY SNAP</div>
+    <div class="step-dots">
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+    <button class="btn-nav" onclick="goTo('screen-welcome')">← Back</button>
+  </div>
+
+  <div class="setup-scroll">
+    <div class="sec-title">CHOOSE TEMPLATE</div>
+    <div class="sec-sub">Select your strip layout — shot count will be set automatically</div>
+    <div class="template-grid" id="template-grid"></div>
+
+    <div class="sec-title">SELECT FILTER</div>
+    <div class="sec-sub">Apply a mood to every shot in your strip</div>
+    <div class="filter-strip" id="filter-strip"></div>
+
+    <div class="sec-title">NUMBER OF SHOTS</div>
+    <div class="sec-sub">Override the template's default count if you like</div>
+    <div class="shot-selector" id="shot-selector">
+      <div class="shot-opt" data-shots="1" onclick="selectShots(this)">
+        <div class="shot-num">1</div><div class="shot-lbl">SOLO</div>
+      </div>
+      <div class="shot-opt" data-shots="2" onclick="selectShots(this)">
+        <div class="shot-num">2</div><div class="shot-lbl">QUICK</div>
+      </div>
+      <div class="shot-opt selected" data-shots="3" onclick="selectShots(this)">
+        <div class="shot-num">3</div><div class="shot-lbl">CLASSIC</div>
+      </div>
+      <div class="shot-opt" data-shots="4" onclick="selectShots(this)">
+        <div class="shot-num">4</div><div class="shot-lbl">FULL</div>
+      </div>
+      <div class="shot-opt" data-shots="6" onclick="selectShots(this)">
+        <div class="shot-num">6</div><div class="shot-lbl">EXTENDED</div>
+      </div>
+    </div>
+
+    <div class="setup-actions">
+      <button class="btn-primary" onclick="startCapture()">📷 START CAPTURE</button>
+      <button class="btn-secondary" onclick="goTo('screen-welcome')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 3: CAPTURE
+══════════════════════════════════════ -->
+<div id="screen-capture" class="screen">
+  <div class="top-bar">
+    <div class="top-bar-logo">SIMPLY SNAP</div>
+    <div class="step-dots">
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+    <button class="btn-nav" onclick="goTo('screen-setup')">← Setup</button>
+  </div>
+
+  <div class="capture-layout">
+    <!-- Camera viewfinder -->
+    <div class="cam-zone">
+      <video id="cam-video" autoplay playsinline muted></video>
+      <div class="cam-ui" id="cam-ui">
+        <div class="cam-icon">📷</div>
+        <div class="cam-msg">
+          Camera preview appears here.<br>
+          <span style="font-size:10px;opacity:.55">Grant camera access or capture mock shots.</span>
+        </div>
+        <button class="btn-enable-cam" onclick="initCamera()">Enable Camera</button>
+      </div>
+      <div class="grid-overlay"></div>
+      <div class="corners">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+      </div>
+      <div class="countdown-display" id="countdown-el">3</div>
+      <div class="flash-overlay" id="flash-el"></div>
+      <canvas id="cap-canvas"></canvas>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="cap-sidebar">
+      <div>
+        <div class="sb-title">SHOTS TAKEN</div>
+        <div class="shot-tracker" id="shot-tracker"></div>
+      </div>
+      <div>
+        <div class="sb-title">FILTER</div>
+        <div class="mini-filters" id="mini-filters"></div>
+      </div>
+      <div class="cap-btn-zone">
+        <div class="shot-label-disp" id="shot-label">SHOT 1 OF 3</div>
+        <div class="hint-text">TAP TO CAPTURE</div>
+        <button class="btn-capture" id="btn-capture" onclick="triggerCapture()">📸</button>
+        <div class="hint-text" style="opacity:.35">SPACEBAR ALSO WORKS</div>
+        <button class="btn-secondary" style="font-size:13px;padding:10px 20px;margin-top:4px" onclick="finishCapture()">
+          DONE → REVIEW
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 4: REVIEW & EDIT
+══════════════════════════════════════ -->
+<div id="screen-review" class="screen">
+  <div class="top-bar">
+    <div class="top-bar-logo">SIMPLY SNAP</div>
+    <div class="step-dots">
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+    </div>
+    <button class="btn-nav" onclick="goTo('screen-capture')">← Retake</button>
+  </div>
+
+  <div class="review-layout">
+    <div class="strip-preview-area">
+      <div class="preview-label">
+        <h2>YOUR STRIP</h2>
+        <p>Live preview of your photo strip</p>
+      </div>
+      <div id="photo-strip" class="photo-strip layout-classic"></div>
+    </div>
+
+    <div class="edit-panel">
+      <div class="edit-inner">
+
+        <div class="edit-sec">
+          <div class="edit-sec-title">ADJUSTMENTS</div>
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-lbl">Brightness</span>
+              <span class="slider-val" id="val-brightness">0</span>
+            </div>
+            <input type="range" min="-100" max="100" value="0" id="sl-brightness"
+              oninput="updateAdjust('brightness', this.value)">
+          </div>
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-lbl">Contrast</span>
+              <span class="slider-val" id="val-contrast">0</span>
+            </div>
+            <input type="range" min="-100" max="100" value="0" id="sl-contrast"
+              oninput="updateAdjust('contrast', this.value)">
+          </div>
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-lbl">Saturation</span>
+              <span class="slider-val" id="val-saturation">0</span>
+            </div>
+            <input type="range" min="-100" max="100" value="0" id="sl-saturation"
+              oninput="updateAdjust('saturation', this.value)">
+          </div>
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-lbl">Vignette</span>
+              <span class="slider-val" id="val-vignette">0</span>
+            </div>
+            <input type="range" min="0" max="100" value="0" id="sl-vignette"
+              oninput="updateAdjust('vignette', this.value)">
+          </div>
+        </div>
+
+        <div class="edit-sec">
+          <div class="edit-sec-title">BORDER COLOR</div>
+          <div class="border-colors" id="border-colors"></div>
+        </div>
+
+        <div class="edit-sec">
+          <div class="edit-sec-title">STRIP TEXT</div>
+          <input type="text" class="styled-input" id="strip-text-input"
+            placeholder="Add event name or message..."
+            oninput="updateStripText(this.value)">
+          <div class="toggle-row" style="margin-top:10px;">
+            <span class="slider-lbl">Show date</span>
+            <button class="toggle-btn" id="toggle-date" onclick="toggleDate()">ON</button>
+          </div>
+        </div>
+
+        <div class="edit-sec">
+          <div class="edit-sec-title">CHANGE FILTER</div>
+          <div class="filter-strip" id="review-filter-strip" style="margin-bottom:0"></div>
+        </div>
+
+      </div>
+      <div class="edit-actions">
+        <button class="btn-primary" onclick="goTo('screen-share')" style="justify-content:center">
+          ✓ LOOKS GREAT — CONTINUE
+        </button>
+        <button class="btn-secondary" onclick="retakePhotos()">Retake Photos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 5: SHARE
+══════════════════════════════════════ -->
+<div id="screen-share" class="screen">
+  <div class="share-glow"></div>
+  <div class="share-inner">
+    <div class="success-ring">✓</div>
+    <div class="share-title">LOOKING GOOD!</div>
+    <div class="share-sub">Your photos are ready. Download your strip below.</div>
+    <div>
+      <button class="share-dl-btn" onclick="downloadStrip()">
+        <div class="share-dl-icon">⬇️</div>
+        <div class="share-dl-info">
+          <span class="share-dl-label">DOWNLOAD STRIP</span>
+          <span class="share-dl-desc">Save as high-quality PNG</span>
+        </div>
+      </button>
+    </div>
+    <div class="share-status" id="share-status"></div>
+    <div class="share-footer">
+      <button class="btn-primary" onclick="newSession()">📸 NEW SESSION</button>
+      <button class="btn-secondary" onclick="retakePhotos()">Retake Photos</button>
+      <button class="btn-tertiary" onclick="editAgain()">Edit Again</button>
+    </div>
+  </div>
+  <footer class="site-footer">Made with ❤️ by mko.</footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

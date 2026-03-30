@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGlow)" />
+
+  <!-- Camera Body -->
+  <rect x="136" y="180" width="240" height="140" rx="24" fill="#d4af37"/>
+
+  <!-- Top bump -->
+  <rect x="200" y="150" width="112" height="40" rx="10" fill="#d4af37"/>
+
+  <!-- Lens outer -->
+  <circle cx="256" cy="250" r="48" fill="#000000"/>
+
+  <!-- Lens inner -->
+  <circle cx="256" cy="250" r="28" fill="#1a1a1a"/>
+
+  <!-- Shine -->
+  <circle cx="272" cy="235" r="8" fill="#ffffff" opacity="0.6"/>
+
+  <!-- Small star accent -->
+  <polygon points="350,170 356,184 372,186 360,196 364,210 350,202 336,210 340,196 328,186 344,184"
+           fill="#d4af37"/>
+</svg>
