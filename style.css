@@ -586,7 +586,7 @@ html, body {
   min-height: 0; overflow: hidden;
 }
 .strip-preview-area {
-  background: var(--gray-mid); padding: 24px 20px;
+  background: var(--gray-light); padding: 24px 20px;
   display: flex; flex-direction: column;
   align-items: center; gap: 20px; overflow-y: auto;
 }
@@ -595,7 +595,7 @@ html, body {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 22px; letter-spacing: 3px;
 }
-.preview-label p { font-size: 11px; color: var(--gray-light); }
+.preview-label p { font-size: 11px; color: var(--white); }
 
 /* ══════════════════════════════════════
    PHOTO STRIP — BASE

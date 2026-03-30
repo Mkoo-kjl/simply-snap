@@ -534,9 +534,6 @@ function toggleDate() {
 }
 
 /* ══════════════════════════════════════
-   SHARE / DOWNLOAD
-══════════════════════════════════════ */
-/* ══════════════════════════════════════
    DYNAMIC DOWNLOAD LOGIC (The Universal Fix)
 ══════════════════════════════════════ */
 async function downloadStrip() {
@@ -651,7 +648,7 @@ async function downloadStrip() {
 
   // 5. Trigger Download
   const link = document.createElement('a');
-  link.download = `simply-snap-${tpl.id}-${Date.now()}.png`;
+  link.download = `photobooth-${tpl.id}-${Date.now()}.png`;
   link.href = canvas.toDataURL('image/png', 1.0);
   link.click();
   
@@ -659,6 +656,71 @@ async function downloadStrip() {
   setTimeout(() => status.textContent = '', 3000);
 }
 
+/* ══════════════════════════════════════
+   SUPPORT FUNCTIONS
+══════════════════════════════════════ */
+async function drawShot(ctx, shot, x, y, w, h) {
+  if (shot.type === 'canvas') {
+    const img = await loadImgAsync(shot.dataUrl);
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const frameRatio = w / h;
+    
+    let sx, sy, sw, sh;
+    if (imgRatio > frameRatio) {
+      sh = img.naturalHeight;
+      sw = sh * frameRatio;
+      sx = (img.naturalWidth - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.naturalWidth;
+      sh = sw / frameRatio;
+      sx = 0;
+      sy = (img.naturalHeight - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  } else {
+    // Mock Mode Support
+    ctx.filter = 'none';
+    ctx.fillStyle = shot.color;
+    ctx.fillRect(x, y, w, h);
+    ctx.font = `${h * 0.4}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(shot.emoji, x + w/2, y + h/2);
+  }
+}
+
+function loadImgAsync(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+}
+
+function drawBranding(ctx, cw, y) {
+  ctx.filter = 'none';
+  const darkBorders = ['#000000', '#1e40af', '#2a7d7b', '#c84b3c'];
+  const isDark = darkBorders.includes(state.borderColor);
+  
+  ctx.textAlign = 'center';
+  ctx.fillStyle = isDark ? '#FFFFFF' : '#111111';
+  
+  // Main Text
+  ctx.font = 'bold 24px "Courier New", Courier, monospace';
+  ctx.letterSpacing = '4px';
+  ctx.fillText((state.stripText || 'SIMPLY SNAP').toUpperCase(), cw / 2, y);
+  
+  // Date
+  if (state.showDate) {
+    ctx.font = '12px monospace';
+    ctx.letterSpacing = '1px';
+    ctx.fillStyle = isDark ? '#AAAAAA' : '#666666';
+    const d = new Date().toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    ctx.fillText(d, cw / 2, y + 25);
+  }
+  ctx.letterSpacing = '0px';
+}
 /* ══════════════════════════════════════
    SUPPORT FUNCTIONS
 ══════════════════════════════════════ */
