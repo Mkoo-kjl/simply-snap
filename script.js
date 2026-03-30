@@ -540,7 +540,7 @@ function setBorderColor(color, el) {
   document.getElementById('photo-strip').style.background = color;
   document.querySelectorAll('.bc-swatch').forEach(d => d.classList.remove('active'));
   el.classList.add('active');
-  const dark = ['#000000', '#1e40af', '#8b5cf6', '#c84b3c', '#ec4899', '#d4a853', '#2a7d7b', ''];
+  const dark = ['#000000', '#1e40af', '#8b5cf6', '#c84b3c'];
   const textColor = dark.includes(color) ? '#fff' : '#111';
   const bt = document.getElementById('strip-brand-disp');
   if (bt) bt.style.color = textColor;
