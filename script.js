@@ -240,14 +240,64 @@ function switchFilterLive(id, el) {
   applyFilterToVideo();
 }
 
+/* ──────────────────────────────────────
+   iOS Safari fix: video.style.filter is ignored on iOS.
+   A canvas overlay runs a rAF loop drawing each video frame
+   with ctx.filter applied. The <video> stays hidden behind it.
+────────────────────────────────────── */
+let _previewRAF = null;
+
 function applyFilterToVideo() {
   const video = document.getElementById('cam-video');
   if (!video) return;
+
+  if (_previewRAF) { cancelAnimationFrame(_previewRAF); _previewRAF = null; }
+
   const filterVal = FILTER_VALUES[state.selectedFilter] || '';
-  video.style.filter = filterVal;
-  // Keep class name for any CSS that targets it
-  const f = FILTERS.find(x => x.id === state.selectedFilter);
-  if (f) video.className = f.css;
+
+  // No live camera — plain CSS filter is fine (mock mode / desktop)
+  if (!state.cameraStream || !video.srcObject) {
+    video.style.filter = filterVal;
+    const f = FILTERS.find(x => x.id === state.selectedFilter);
+    if (f) video.className = f.css;
+    return;
+  }
+
+  // Get or create the canvas overlay
+  let overlay = document.getElementById('cam-filter-overlay');
+  if (!overlay) {
+    overlay = document.createElement('canvas');
+    overlay.id = 'cam-filter-overlay';
+    overlay.style.cssText = [
+      'position:absolute', 'inset:0', 'width:100%', 'height:100%',
+      'object-fit:cover', 'pointer-events:none', 'z-index:2',
+      'transform:scaleX(-1)'
+    ].join(';');
+    const camZone = document.querySelector('.cam-zone');
+    if (camZone) camZone.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  video.style.opacity = '0'; // hide raw video; canvas is the viewfinder
+
+  function drawFrame() {
+    if (!state.cameraStream || !video.srcObject) {
+      if (overlay) overlay.style.display = 'none';
+      if (video)   video.style.opacity = '1';
+      return;
+    }
+    if (video.readyState >= 2) {
+      const vw = video.videoWidth  || 640;
+      const vh = video.videoHeight || 480;
+      if (overlay.width !== vw || overlay.height !== vh) {
+        overlay.width = vw; overlay.height = vh;
+      }
+      const ctx = overlay.getContext('2d');
+      ctx.filter = filterVal || 'none';
+      ctx.drawImage(video, 0, 0, vw, vh);
+    }
+    _previewRAF = requestAnimationFrame(drawFrame);
+  }
+  _previewRAF = requestAnimationFrame(drawFrame);
 }
 
 function updateShotLabel() {
@@ -335,13 +385,30 @@ function takePhoto() {
 
     if (video && video.srcObject && video.readyState >= 2) {
       const canvas = document.getElementById('cap-canvas');
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-      ctx.restore();
+      const overlay = document.getElementById('cam-filter-overlay');
+      const useOverlay = overlay && overlay.width > 0 && overlay.height > 0;
+
+      if (useOverlay) {
+        // Overlay already has filter baked in; undo the CSS mirror so saved image is correct
+        canvas.width  = overlay.width;
+        canvas.height = overlay.height;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+      } else {
+        // Desktop fallback: draw from video with ctx.filter + mirror
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.filter = FILTER_VALUES[state.selectedFilter] || 'none';
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+        ctx.filter = 'none';
+      }
+
       shotData = { type: 'canvas', dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
     } else {
       const emoji = MOCK_EMOJIS[state.currentShot % MOCK_EMOJIS.length];
@@ -646,14 +713,32 @@ async function downloadStrip() {
   // 4. Draw Branding Footer
   drawBranding(ctx, cw, ch - (FOOTER_SPACE / 2) - 10);
 
-  // 5. Trigger Download
-  const link = document.createElement('a');
-  link.download = `photobooth-${tpl.id}-${Date.now()}.png`;
-  link.href = canvas.toDataURL('image/png', 1.0);
-  link.click();
-  
-  status.textContent = '✅ SAVED TO DEVICE';
-  setTimeout(() => status.textContent = '', 3000);
+  // 5. Trigger Download — iOS doesn't support <a download>.click()
+  const dataUrl = canvas.toDataURL('image/png', 1.0);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`<html><head><title>Simply Snap</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <style>body{margin:0;background:#080808;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;min-height:100vh;font-family:sans-serif;color:#f5f0e8;padding:16px;text-align:center}
+        img{max-width:100%;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+        p{margin:16px 0 4px;font-size:14px;opacity:.7}strong{font-size:16px}</style></head>
+        <body><strong>📸 Your Strip is Ready!</strong>
+        <p>Long-press the image, then tap <em>Save to Photos</em></p>
+        <img src="${dataUrl}" alt="Photo Strip"></body></html>`);
+      win.document.close();
+    }
+  } else {
+    const link = document.createElement('a');
+    link.download = `photobooth-${tpl.id}-${Date.now()}.png`;
+    link.href = dataUrl;
+    link.click();
+  }
+
+  status.textContent = isIOS ? '📱 TAP "SAVE IMAGE" IN THE NEW TAB' : '✅ SAVED TO DEVICE';
+  setTimeout(() => status.textContent = '', 5000);
 }
 
 /* ══════════════════════════════════════
@@ -664,22 +749,16 @@ async function drawShot(ctx, shot, x, y, w, h) {
     const img = await loadImgAsync(shot.dataUrl);
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const frameRatio = w / h;
-    
     let sx, sy, sw, sh;
     if (imgRatio > frameRatio) {
-      sh = img.naturalHeight;
-      sw = sh * frameRatio;
-      sx = (img.naturalWidth - sw) / 2;
-      sy = 0;
+      sh = img.naturalHeight; sw = sh * frameRatio;
+      sx = (img.naturalWidth - sw) / 2; sy = 0;
     } else {
-      sw = img.naturalWidth;
-      sh = sw / frameRatio;
-      sx = 0;
-      sy = (img.naturalHeight - sh) / 2;
+      sw = img.naturalWidth; sh = sw / frameRatio;
+      sx = 0; sy = (img.naturalHeight - sh) / 2;
     }
     ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
   } else {
-    // Mock Mode Support
     ctx.filter = 'none';
     ctx.fillStyle = shot.color;
     ctx.fillRect(x, y, w, h);
@@ -691,7 +770,7 @@ async function drawShot(ctx, shot, x, y, w, h) {
 }
 
 function loadImgAsync(src) {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.src = src;
@@ -702,81 +781,11 @@ function drawBranding(ctx, cw, y) {
   ctx.filter = 'none';
   const darkBorders = ['#000000', '#1e40af', '#2a7d7b', '#c84b3c'];
   const isDark = darkBorders.includes(state.borderColor);
-  
   ctx.textAlign = 'center';
   ctx.fillStyle = isDark ? '#FFFFFF' : '#111111';
-  
-  // Main Text
   ctx.font = 'bold 24px "Courier New", Courier, monospace';
   ctx.letterSpacing = '4px';
   ctx.fillText((state.stripText || 'SIMPLY SNAP').toUpperCase(), cw / 2, y);
-  
-  // Date
-  if (state.showDate) {
-    ctx.font = '12px monospace';
-    ctx.letterSpacing = '1px';
-    ctx.fillStyle = isDark ? '#AAAAAA' : '#666666';
-    const d = new Date().toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
-    ctx.fillText(d, cw / 2, y + 25);
-  }
-  ctx.letterSpacing = '0px';
-}
-/* ══════════════════════════════════════
-   SUPPORT FUNCTIONS
-══════════════════════════════════════ */
-async function drawShot(ctx, shot, x, y, w, h) {
-  if (shot.type === 'canvas') {
-    const img = await loadImgAsync(shot.dataUrl);
-    const imgRatio = img.naturalWidth / img.naturalHeight;
-    const frameRatio = w / h;
-    
-    let sx, sy, sw, sh;
-    if (imgRatio > frameRatio) {
-      sh = img.naturalHeight;
-      sw = sh * frameRatio;
-      sx = (img.naturalWidth - sw) / 2;
-      sy = 0;
-    } else {
-      sw = img.naturalWidth;
-      sh = sw / frameRatio;
-      sx = 0;
-      sy = (img.naturalHeight - sh) / 2;
-    }
-    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
-  } else {
-    // Mock Mode Support
-    ctx.filter = 'none';
-    ctx.fillStyle = shot.color;
-    ctx.fillRect(x, y, w, h);
-    ctx.font = `${h * 0.4}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(shot.emoji, x + w/2, y + h/2);
-  }
-}
-
-function loadImgAsync(src) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.src = src;
-  });
-}
-
-function drawBranding(ctx, cw, y) {
-  ctx.filter = 'none';
-  const darkBorders = ['#000000', '#1e40af', '#2a7d7b', '#c84b3c'];
-  const isDark = darkBorders.includes(state.borderColor);
-  
-  ctx.textAlign = 'center';
-  ctx.fillStyle = isDark ? '#FFFFFF' : '#111111';
-  
-  // Main Text
-  ctx.font = 'bold 24px "Courier New", Courier, monospace';
-  ctx.letterSpacing = '4px';
-  ctx.fillText((state.stripText || 'SIMPLY SNAP').toUpperCase(), cw / 2, y);
-  
-  // Date
   if (state.showDate) {
     ctx.font = '12px monospace';
     ctx.letterSpacing = '1px';
@@ -829,11 +838,15 @@ function editAgain() {
 }
 
 function stopCamera() {
+  if (_previewRAF) { cancelAnimationFrame(_previewRAF); _previewRAF = null; }
+  const overlay = document.getElementById('cam-filter-overlay');
+  if (overlay) { overlay.style.display = 'none'; overlay.width = 0; overlay.height = 0; }
+
   if (state.cameraStream) {
     state.cameraStream.getTracks().forEach(t => t.stop());
     state.cameraStream = null;
     const v = document.getElementById('cam-video');
-    if (v) { v.srcObject = null; v.style.display = 'none'; }
+    if (v) { v.srcObject = null; v.style.display = 'none'; v.style.opacity = '1'; }
     const ui = document.getElementById('cam-ui');
     if (ui) {
       ui.style.display = 'flex';
