@@ -536,179 +536,191 @@ function toggleDate() {
 /* ══════════════════════════════════════
    SHARE / DOWNLOAD
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   DYNAMIC DOWNLOAD LOGIC (The Universal Fix)
+══════════════════════════════════════ */
 async function downloadStrip() {
   const status = document.getElementById('share-status');
-  status.textContent = '🎨 COMPOSITING YOUR STRIP...';
+  status.textContent = '🎨 GENERATING HI-RES STRIP...';
 
-  const tpl    = TEMPLATES.find(t => t.id === state.selectedTemplate) || TEMPLATES[0];
-  const filter = FILTERS.find(f => f.id === state.selectedFilter) || FILTERS[0];
-  const shots  = state.capturedShots;
-
-  if (shots.length === 0) { status.textContent = '⚠️ No photos to save!'; return; }
+  const tpl = TEMPLATES.find(t => t.id === state.selectedTemplate) || TEMPLATES[0];
+  const shots = state.capturedShots;
+  if (shots.length === 0) { status.textContent = '⚠️ No photos!'; return; }
 
   const canvas = document.createElement('canvas');
-  const ctx    = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
+  
+  // Apply Adjustments & Filters
   const { brightness, contrast, saturation } = state.adjustments;
   const adjFilter = `brightness(${1 + brightness / 100}) contrast(${1 + contrast / 100}) saturate(${1 + saturation / 100})`;
-  const filterBase = FILTER_VALUES[state.selectedFilter] || '';
-  // Note: blur() cannot be used in ctx.filter in most browsers, so strip it for canvas
-  const safeFilterBase = filterBase.replace(/blur\([^)]*\)/g, '').trim();
-  const cssFilter = [safeFilterBase, adjFilter].filter(Boolean).join(' ');
+  const filterBase = (FILTER_VALUES[state.selectedFilter] || '').replace(/blur\([^)]*\)/g, '');
+  const cssFilter = [filterBase, adjFilter].filter(Boolean).join(' ');
 
-  const PAD   = 32;
-  const GAP   = 6;
-  const BRAND = 56;   // footer height: 22px title + 16px date + 18px padding
-  let cw, ch;
+  // Global Sizing Constants
+  const PAD = 35; 
+  const GAP = 10;
+  const FOOTER_SPACE = 80; // Space for text/date at bottom
+  
+  let cw, ch, fw, fh;
 
-  if (tpl.layout === 'duo') {
-    cw = 640;
-    const fw = (cw - PAD * 2 - GAP) / 2;
-    const fh = Math.round(fw * (3 / 2));
-    ch = PAD * 2 + fh + BRAND;
-  } else if (tpl.layout === 'grid') {
-    cw = 560;
-    const fw = (cw - PAD * 2 - GAP) / 2;
-    const fh = fw;
-    ch = PAD * 2 + fh * 2 + GAP + BRAND;
+  /* ══════════════════════════════════════
+     LAYOUT CALCULATION ENGINE
+  ══════════════════════════════════════ */
+  if (tpl.layout === 'grid') {
+    cw = 600;
+    fw = (cw - (PAD * 2) - GAP) / 2;
+    fh = fw; // Square frames for grid
+    const rows = Math.ceil(shots.length / 2);
+    ch = (PAD * 2) + (rows * fh) + ((rows - 1) * GAP) + FOOTER_SPACE;
+
+  } else if (tpl.layout === 'duo') {
+    cw = 800;
+    fw = (cw - (PAD * 2) - GAP) / 2;
+    fh = Math.round(fw * 1.4); // Portrait frames
+    ch = (PAD * 2) + fh + FOOTER_SPACE;
+
   } else if (tpl.layout === 'widestrip') {
-    cw = 560;
-    const fw = cw - PAD * 2;
-    const fh = Math.round(fw * (9 / 16));
-    ch = PAD * 2 + fh * shots.length + GAP * (shots.length - 1) + BRAND;
+    cw = 600;
+    fw = cw - (PAD * 2);
+    fh = Math.round(fw * (9 / 16)); // Cinematic wide
+    ch = (PAD * 2) + (shots.length * fh) + ((shots.length - 1) * GAP) + FOOTER_SPACE;
+
   } else if (tpl.layout === 'polaroid') {
-    cw = 480;
-    const fw = cw - PAD * 2;
-    ch = PAD + fw + BRAND + 8;
+    cw = 500;
+    fw = cw - (PAD * 2);
+    fh = fw; // Square
+    ch = PAD + fw + FOOTER_SPACE + 20;
+
   } else if (tpl.layout === 'magazine') {
-    cw = 520;
-    const fw = cw - PAD * 2;
-    const fh = Math.round(fw * (3 / 4));
-    ch = fh * shots.length + 3 * (shots.length - 1) + BRAND;
-  } else {
-    // classic
-    cw = 400;
-    const fw = cw - PAD * 2;
-    const fh = Math.round(fw * (3 / 4));
-    ch = PAD * 2 + fh * shots.length + GAP * (shots.length - 1) + BRAND;
+    cw = 600;
+    fw = cw; // Full bleed
+    fh = Math.round(fw * 0.8);
+    ch = (shots.length * fh) + FOOTER_SPACE;
+
+  } else { 
+    // Default / Classic (Vertical Strip)
+    cw = 420;
+    fw = cw - (PAD * 2);
+    fh = Math.round(fw * 0.75); // 4:3 Aspect
+    ch = (PAD * 2) + (shots.length * fh) + ((shots.length - 1) * GAP) + FOOTER_SPACE;
   }
 
-  canvas.width  = cw;
+  canvas.width = cw;
   canvas.height = ch;
 
+  // 1. Draw Border/Background
   ctx.fillStyle = state.borderColor;
   ctx.fillRect(0, 0, cw, ch);
-  ctx.filter = cssFilter;
 
-  if (tpl.layout === 'duo') {
-    const fw = (cw - PAD * 2 - GAP) / 2;
-    const fh = Math.round(fw * (3 / 2));
-    for (let i = 0; i < Math.min(shots.length, 2); i++) {
-      await drawShot(ctx, shots[i], PAD + i * (fw + GAP), PAD, fw, fh);
-    }
-    drawBranding(ctx, cw, PAD + fh + 8);
-  } else if (tpl.layout === 'grid') {
-    const fw = (cw - PAD * 2 - GAP) / 2;
-    const fh = fw;
-    for (let i = 0; i < Math.min(shots.length, 4); i++) {
-      const col = i % 2, row = Math.floor(i / 2);
-      await drawShot(ctx, shots[i], PAD + col * (fw + GAP), PAD + row * (fh + GAP), fw, fh);
-    }
-    drawBranding(ctx, cw, PAD + fh * 2 + GAP + 8);
-  } else if (tpl.layout === 'polaroid') {
-    const fw = cw - PAD * 2;
-    await drawShot(ctx, shots[0], PAD, PAD, fw, fw);
-    drawBranding(ctx, cw, PAD + fw + 10);
-  } else {
-    const fw = cw - PAD * 2;
-    const fh = tpl.layout === 'widestrip'
-      ? Math.round(fw * 9 / 16)
-      : tpl.layout === 'magazine'
-        ? Math.round(fw * 3 / 4)
-        : Math.round(fw * 3 / 4);
+  // 2. Draw Every Captured Shot
+  for (let i = 0; i < shots.length; i++) {
+    ctx.filter = cssFilter;
+    let x, y, drawW = fw, drawH = fh;
 
-    if (tpl.layout === 'magazine') {
-      // magazine: no top pad, tight stacking
-      for (let i = 0; i < shots.length; i++) {
-        await drawShot(ctx, shots[i], 0, i * (fh + 3), cw, fh);
-      }
-      drawBranding(ctx, cw, shots.length * fh + shots.length * 3 + 10);
+    if (tpl.layout === 'grid') {
+      x = PAD + (i % 2) * (fw + GAP);
+      y = PAD + Math.floor(i / 2) * (fh + GAP);
+    } else if (tpl.layout === 'duo') {
+      x = PAD + i * (fw + GAP);
+      y = PAD;
+    } else if (tpl.layout === 'magazine') {
+      x = 0;
+      y = i * fh;
+      drawW = cw;
     } else {
-      for (let i = 0; i < shots.length; i++) {
-        await drawShot(ctx, shots[i], PAD, PAD + i * (fh + GAP), fw, fh);
-      }
-      drawBranding(ctx, cw, PAD + shots.length * fh + (shots.length - 1) * GAP + 10);
+      x = PAD;
+      y = PAD + i * (fh + GAP);
     }
+
+    await drawShot(ctx, shots[i], x, y, drawW, drawH);
   }
 
-  ctx.filter = 'none';
+  // 3. Apply Vignette Overlay (if active)
   if (state.adjustments.vignette > 0) {
+    ctx.filter = 'none';
     const v = state.adjustments.vignette / 100;
-    const vGrad = ctx.createRadialGradient(cw / 2, ch / 2, ch * 0.2, cw / 2, ch / 2, ch * 0.8);
-    vGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    vGrad.addColorStop(1, `rgba(0,0,0,${v * 0.7})`);
-    ctx.fillStyle = vGrad;
-    ctx.fillRect(0, 0, cw, ch);
+    const grad = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, ch/1.2);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(1, `rgba(0,0,0,${v * 0.6})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0, cw, ch);
   }
 
+  // 4. Draw Branding Footer
+  drawBranding(ctx, cw, ch - (FOOTER_SPACE / 2) - 10);
+
+  // 5. Trigger Download
   const link = document.createElement('a');
-  link.download = `simply-snap-${Date.now()}.png`;
+  link.download = `simply-snap-${tpl.id}-${Date.now()}.png`;
   link.href = canvas.toDataURL('image/png', 1.0);
   link.click();
-  status.textContent = '✅ DOWNLOAD COMPLETE!';
+  
+  status.textContent = '✅ SAVED TO DEVICE';
+  setTimeout(() => status.textContent = '', 3000);
 }
 
+/* ══════════════════════════════════════
+   SUPPORT FUNCTIONS
+══════════════════════════════════════ */
 async function drawShot(ctx, shot, x, y, w, h) {
   if (shot.type === 'canvas') {
-    try {
-      const img = await loadImgAsync(shot.dataUrl);
-      const ir  = img.naturalWidth / img.naturalHeight;
-      const fr  = w / h;
-      let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
-      if (ir > fr) { sw = sh * fr; sx = (img.naturalWidth - sw) / 2; }
-      else         { sh = sw / fr; sy = (img.naturalHeight - sh) / 2; }
-      ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
-    } catch (e) {
-      ctx.fillStyle = '#333'; ctx.fillRect(x, y, w, h);
+    const img = await loadImgAsync(shot.dataUrl);
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const frameRatio = w / h;
+    
+    let sx, sy, sw, sh;
+    if (imgRatio > frameRatio) {
+      sh = img.naturalHeight;
+      sw = sh * frameRatio;
+      sx = (img.naturalWidth - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.naturalWidth;
+      sh = sw / frameRatio;
+      sx = 0;
+      sy = (img.naturalHeight - sh) / 2;
     }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
   } else {
+    // Mock Mode Support
     ctx.filter = 'none';
-    ctx.fillStyle = shot.color; ctx.fillRect(x, y, w, h);
-    ctx.font = `${Math.min(w, h) * 0.4}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(shot.emoji, x + w / 2, y + h / 2);
+    ctx.fillStyle = shot.color;
+    ctx.fillRect(x, y, w, h);
+    ctx.font = `${h * 0.4}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(shot.emoji, x + w/2, y + h/2);
   }
 }
 
 function loadImgAsync(src) {
-  return new Promise((res, rej) => {
+  return new Promise((resolve) => {
     const img = new Image();
-    img.onload  = () => res(img);
-    img.onerror = rej;
+    img.onload = () => resolve(img);
     img.src = src;
   });
 }
 
-function drawBranding(ctx, cw, y, availableHeight) {
+function drawBranding(ctx, cw, y) {
   ctx.filter = 'none';
-  const dark = ['#000000', '#1e40af', '#8b5cf6', '#c84b3c'];
-  const isDark = dark.includes(state.borderColor);
-  const textColor = isDark ? '#eee' : '#222';
-  const subColor  = isDark ? '#bbb' : '#888';
-
-  // Title
-  ctx.fillStyle = textColor;
+  const darkBorders = ['#000000', '#1e40af', '#2a7d7b', '#c84b3c'];
+  const isDark = darkBorders.includes(state.borderColor);
+  
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = 'bold 22px "Arial Narrow", Arial, sans-serif';
-  ctx.letterSpacing = '3px';
-  ctx.fillText((state.stripText || 'SIMPLY SNAP').toUpperCase(), cw / 2, y + 22);
-
+  ctx.fillStyle = isDark ? '#FFFFFF' : '#111111';
+  
+  // Main Text
+  ctx.font = 'bold 24px "Courier New", Courier, monospace';
+  ctx.letterSpacing = '4px';
+  ctx.fillText((state.stripText || 'SIMPLY SNAP').toUpperCase(), cw / 2, y);
+  
   // Date
   if (state.showDate) {
-    ctx.font = '10px monospace';
-    ctx.fillStyle = subColor;
-    const d = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    ctx.fillText(d, cw / 2, y + 38);
+    ctx.font = '12px monospace';
+    ctx.letterSpacing = '1px';
+    ctx.fillStyle = isDark ? '#AAAAAA' : '#666666';
+    const d = new Date().toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    ctx.fillText(d, cw / 2, y + 25);
   }
   ctx.letterSpacing = '0px';
 }

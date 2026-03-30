@@ -586,7 +586,7 @@ html, body {
   min-height: 0; overflow: hidden;
 }
 .strip-preview-area {
-  background: #0c0c0c; padding: 24px 20px;
+  background: var(--gray-mid); padding: 24px 20px;
   display: flex; flex-direction: column;
   align-items: center; gap: 20px; overflow-y: auto;
 }
@@ -609,7 +609,7 @@ html, body {
   flex-direction: column;
 }
 .photo-strip.layout-classic {
-  width: 200px; padding: 10px 10px 0; gap: 4px;
+  width: 200px; padding: 10px 10px 0; gap: 8px;
 }
 .photo-strip.layout-classic .strip-frame { aspect-ratio: 4/3; }
 
@@ -633,7 +633,7 @@ html, body {
 .photo-strip.layout-grid .strip-frame { aspect-ratio: 1; }
 
 .photo-strip.layout-widestrip {
-  width: 260px; padding: 12px 12px 0; gap: 5px;
+  width: 260px; padding: 12px 12px 0; gap: 7px;
 }
 .photo-strip.layout-widestrip .strip-frame { aspect-ratio: 16/9; }
 .photo-strip.layout-widestrip .strip-branding { margin-top: 3px; padding: 8px 4px 6px; }
