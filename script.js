@@ -75,22 +75,16 @@ function buildTemplateGrid() {
     let layoutClass = `layout-${t.layout}`;
 
     if (t.layout === 'grid') {
-      // 2×2 grid
       frames = [...Array(4)].map(() => '<div class="tpl-frame"></div>').join('');
     } else if (t.layout === 'duo') {
-      // 2 side-by-side
       frames = '<div class="tpl-frame"></div><div class="tpl-frame"></div>';
     } else if (t.layout === 'polaroid') {
-      // single frame
       frames = '<div class="tpl-frame"></div>';
     } else if (t.layout === 'widestrip') {
-      // 4 wide landscape rows
       frames = [...Array(4)].map(() => '<div class="tpl-frame"></div>').join('');
     } else if (t.layout === 'magazine') {
-      // 3 rows, full bleed
       frames = [...Array(t.frames)].map(() => '<div class="tpl-frame"></div>').join('');
     } else {
-      // classic: 3 equal rows
       frames = [...Array(t.frames)].map(() => '<div class="tpl-frame"></div>').join('');
     }
 
@@ -117,7 +111,6 @@ function buildFilterStrip(containerId) {
       <div class="filter-label">${f.name}</div>
     </div>`).join('');
 
-  // Draw filter preview onto each canvas
   requestAnimationFrame(() => renderFilterThumbs(containerId));
 }
 
@@ -131,31 +124,26 @@ function renderFilterThumbs(containerId) {
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
 
-    // Draw a sample scene: gradient sky + ground + circle (face-like)
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, '#5b8cde');
     sky.addColorStop(1, '#a8c8f0');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
 
-    // Ground
     const gnd = ctx.createLinearGradient(0, h * 0.6, 0, h);
     gnd.addColorStop(0, '#5a9e5a');
     gnd.addColorStop(1, '#3d7a3d');
     ctx.fillStyle = gnd;
     ctx.fillRect(0, h * 0.6, w, h * 0.4);
 
-    // Sun
     ctx.fillStyle = '#f5d060';
     ctx.beginPath(); ctx.arc(w * 0.75, h * 0.22, 9, 0, Math.PI * 2); ctx.fill();
 
-    // Person silhouette
     ctx.fillStyle = '#e8b87a';
     ctx.beginPath(); ctx.arc(w / 2, h * 0.42, 11, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#4a6fa5';
     ctx.fillRect(w / 2 - 9, h * 0.53, 18, 20);
 
-    // Apply filter via CSS on the canvas element itself
     const filterVal = FILTER_VALUES[f.id] || '';
     canvas.style.filter = filterVal;
   });
@@ -180,13 +168,11 @@ function syncShotSelector() {
 
 function selectFilter(id, el, containerId) {
   state.selectedFilter = id;
-  // Re-mark all swatches across all filter strips
   document.querySelectorAll('.filter-swatch').forEach(sw => {
     const oc = sw.getAttribute('onclick') || '';
     sw.classList.toggle('selected', oc.startsWith(`selectFilter('${id}'`));
   });
   applyFilterToVideo();
-  // If review strip is showing, just reapply — don't rebuild (would reset sliders)
   const strip = document.getElementById('photo-strip');
   if (strip && strip.children.length > 0) applyAdjustments();
 }
@@ -233,7 +219,6 @@ function switchFilterLive(id, el) {
   state.selectedFilter = id;
   document.querySelectorAll('.mini-flt').forEach(m => m.classList.remove('active'));
   el.classList.add('active');
-  // Sync setup filter strip
   document.querySelectorAll('#filter-strip .filter-swatch').forEach(s => {
     const oc = s.getAttribute('onclick') || '';
     s.classList.toggle('selected', oc.startsWith(`selectFilter('${id}'`));
@@ -257,7 +242,6 @@ function applyFilterToVideo() {
 
   const filterVal = FILTER_VALUES[state.selectedFilter] || '';
 
-  // No live camera — plain CSS filter is fine (mock mode / desktop)
   if (!state.cameraStream || !video.srcObject) {
     video.style.filter = filterVal;
     const f = FILTERS.find(x => x.id === state.selectedFilter);
@@ -265,7 +249,6 @@ function applyFilterToVideo() {
     return;
   }
 
-  // Get or create the canvas overlay
   let overlay = document.getElementById('cam-filter-overlay');
   if (!overlay) {
     overlay = document.createElement('canvas');
@@ -279,9 +262,8 @@ function applyFilterToVideo() {
     if (camZone) camZone.appendChild(overlay);
   }
   overlay.style.display = 'block';
-  // Safari iOS can be inconsistent with ctx.filter; CSS filter on the overlay canvas is more reliable.
   overlay.style.filter = filterVal || 'none';
-  video.style.opacity = '0'; // hide raw video; canvas is the viewfinder
+  video.style.opacity = '0';
 
   function drawFrame() {
     if (!state.cameraStream || !video.srcObject) {
@@ -389,7 +371,6 @@ function takePhoto() {
 
     if (video && video.srcObject && video.readyState >= 2) {
       const canvas = document.getElementById('cap-canvas');
-      // Capture the raw frame (unfiltered). We apply selected filters later in review/export to avoid double-filtering.
       canvas.width  = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
@@ -485,7 +466,6 @@ function buildReviewStrip() {
     return `<div class="strip-frame" id="strip-frame-${i}">${inner}</div>`;
   }).join('');
 
-  // duo and grid need a wrapper row so branding always sits BELOW all frames
   const needsWrapper = tpl.layout === 'duo' || tpl.layout === 'grid';
   const framesBlock = needsWrapper
     ? `<div class="strip-frames-row">${framesHTML}</div>`
@@ -503,7 +483,6 @@ function buildReviewStrip() {
   buildBorderColors();
   buildFilterStrip('review-filter-strip');
 
-  // Sync toggle button state
   const toggleBtn = document.getElementById('toggle-date');
   if (toggleBtn) {
     toggleBtn.textContent = state.showDate ? 'ON' : 'OFF';
@@ -554,7 +533,6 @@ function applyAdjustments() {
   const { brightness, contrast, saturation, vignette } = state.adjustments;
   const adjStr = `brightness(${1 + brightness / 100}) contrast(${1 + contrast / 100}) saturate(${1 + saturation / 100})`;
   const filterBase = FILTER_VALUES[state.selectedFilter] || '';
-  // Combine: base filter first, then adjustments on top
   const combined = [filterBase, adjStr].filter(Boolean).join(' ');
 
   state.capturedShots.forEach((_, i) => {
@@ -562,7 +540,6 @@ function applyAdjustments() {
     if (!frame) return;
     const img = frame.querySelector('img, .mock-fill');
     if (img) {
-      // Remove CSS filter class — we're driving everything via inline style
       img.className = img.className.replace(/filter-\S+/g, '').trim();
       img.style.filter = combined;
     }
@@ -601,8 +578,10 @@ async function downloadStrip() {
   const status = document.getElementById('share-status');
   status.textContent = '🎨 GENERATING HI-RES STRIP...';
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  // Open the iOS tab immediately (before the async rendering work) to avoid popup timing blocks.
+  const ua = navigator.userAgent || '';
+  const isAppleTouchDevice = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  const isIOS = (/iPad|iPhone|iPod/.test(ua) || isAppleTouchDevice) && !window.MSStream;
+
   let iosWin = null;
   if (isIOS) {
     iosWin = window.open('', '_blank');
@@ -627,73 +606,65 @@ async function downloadStrip() {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  // Apply Adjustments & Filters
   const { brightness, contrast, saturation } = state.adjustments;
   const adjFilter = `brightness(${1 + brightness / 100}) contrast(${1 + contrast / 100}) saturate(${1 + saturation / 100})`;
   const filterBase = (FILTER_VALUES[state.selectedFilter] || '').replace(/blur\([^)]*\)/g, '');
   const cssFilter = [filterBase, adjFilter].filter(Boolean).join(' ');
+  const pixelParams = getPixelFilterParams(state.selectedFilter, state.adjustments);
 
-  // Global Sizing Constants
   const PAD = 35;
   const GAP = 10;
-  const FOOTER_SPACE = 80; // Space for text/date at bottom
+  const FOOTER_SPACE = 80;
 
   let cw, ch, fw, fh;
 
-  /* ══════════════════════════════════════
-     LAYOUT CALCULATION ENGINE
-  ══════════════════════════════════════ */
   if (tpl.layout === 'grid') {
     cw = 600;
     fw = (cw - (PAD * 2) - GAP) / 2;
-    fh = fw; // Square frames for grid
+    fh = fw;
     const rows = Math.ceil(shots.length / 2);
     ch = (PAD * 2) + (rows * fh) + ((rows - 1) * GAP) + FOOTER_SPACE;
 
   } else if (tpl.layout === 'duo') {
     cw = 800;
     fw = (cw - (PAD * 2) - GAP) / 2;
-    fh = Math.round(fw * 1.4); // Portrait frames
+    fh = Math.round(fw * 1.4);
     ch = (PAD * 2) + fh + FOOTER_SPACE;
 
   } else if (tpl.layout === 'widestrip') {
     cw = 600;
     fw = cw - (PAD * 2);
-    fh = Math.round(fw * (9 / 16)); // Cinematic wide
+    fh = Math.round(fw * (9 / 16));
     ch = (PAD * 2) + (shots.length * fh) + ((shots.length - 1) * GAP) + FOOTER_SPACE;
 
   } else if (tpl.layout === 'polaroid') {
     cw = 500;
     fw = cw - (PAD * 2);
-    fh = fw; // Square
+    fh = fw;
     ch = PAD + fw + FOOTER_SPACE + 20;
 
   } else if (tpl.layout === 'magazine') {
     cw = 600;
-    fw = cw; // Full bleed
+    fw = cw;
     fh = Math.round(fw * 0.8);
     ch = (shots.length * fh) + FOOTER_SPACE;
 
   } else {
-    // Default / Classic (Vertical Strip)
     cw = 420;
     fw = cw - (PAD * 2);
-    fh = Math.round(fw * 0.75); // 4:3 Aspect
+    fh = Math.round(fw * 0.75);
     ch = (PAD * 2) + (shots.length * fh) + ((shots.length - 1) * GAP) + FOOTER_SPACE;
   }
 
   canvas.width = cw;
   canvas.height = ch;
 
-  // 1. Draw Border/Background
   ctx.fillStyle = state.borderColor;
   ctx.fillRect(0, 0, cw, ch);
 
-  // 2. Draw Every Captured Shot
   for (let i = 0; i < shots.length; i++) {
-    // Some iOS Safari versions can be picky about when ctx.filter is applied;
-    // we set it again right before drawImage inside drawShot().
-    ctx.filter = cssFilter;
+    ctx.filter = isIOS ? 'none' : cssFilter;
+
     let x, y, drawW = fw, drawH = fh;
 
     if (tpl.layout === 'grid') {
@@ -711,10 +682,13 @@ async function downloadStrip() {
       y = PAD + i * (fh + GAP);
     }
 
-    await drawShot(ctx, shots[i], x, y, drawW, drawH, cssFilter);
+    if (isIOS) {
+      await drawShotIOS(ctx, shots[i], x, y, drawW, drawH, pixelParams);
+    } else {
+      await drawShot(ctx, shots[i], x, y, drawW, drawH, cssFilter);
+    }
   }
 
-  // 3. Apply Vignette Overlay (if active)
   if (state.adjustments.vignette > 0) {
     ctx.filter = 'none';
     const v = state.adjustments.vignette / 100;
@@ -725,10 +699,8 @@ async function downloadStrip() {
     ctx.fillRect(0,0, cw, ch);
   }
 
-  // 4. Draw Branding Footer
   drawBranding(ctx, cw, ch - (FOOTER_SPACE / 2) - 10);
 
-  // 5. Trigger Download — iOS doesn't support <a download>.click()
   const dataUrl = canvas.toDataURL('image/png', 1.0);
   if (isIOS) {
     if (iosWin) {
@@ -765,7 +737,6 @@ async function downloadStrip() {
 async function drawShot(ctx, shot, x, y, w, h, filterStr) {
   if (shot.type === 'canvas') {
     const img = await loadImgAsync(shot.dataUrl);
-    // Ensure the filter is set immediately before drawing the image.
     if (typeof filterStr === 'string' && filterStr.length > 0) {
       ctx.filter = filterStr;
     } else {
@@ -796,12 +767,191 @@ async function drawShot(ctx, shot, x, y, w, h, filterStr) {
   }
 }
 
+async function drawShotIOS(ctx, shot, x, y, w, h, params) {
+  if (shot.type !== 'canvas') {
+    ctx.fillStyle = shot.color;
+    ctx.fillRect(x, y, w, h);
+    ctx.font = `${h * 0.4}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(shot.emoji, x + w/2, y + h/2);
+    return;
+  }
+
+  const img = await loadImgAsync(shot.dataUrl);
+
+  const imgRatio = img.naturalWidth / img.naturalHeight;
+  const frameRatio = w / h;
+  let sx, sy, sw, sh;
+
+  if (imgRatio > frameRatio) {
+    sh = img.naturalHeight; sw = sh * frameRatio;
+    sx = (img.naturalWidth - sw) / 2; sy = 0;
+  } else {
+    sw = img.naturalWidth; sh = sw / frameRatio;
+    sx = 0; sy = (img.naturalHeight - sh) / 2;
+  }
+
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.max(1, Math.round(w));
+  tmp.height = Math.max(1, Math.round(h));
+  const tctx = tmp.getContext('2d', { willReadFrequently: true });
+  tctx.filter = 'none';
+  tctx.drawImage(img, sx, sy, sw, sh, 0, 0, tmp.width, tmp.height);
+
+  const imageData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+  applyPixelFilters(imageData.data, params);
+  tctx.putImageData(imageData, 0, 0);
+
+  ctx.drawImage(tmp, x, y, w, h);
+}
+
 function loadImgAsync(src) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.src = src;
   });
+}
+
+function getPixelFilterParams(filterId, adjustments) {
+  const base = {
+    brightness: 1,
+    contrast: 1,
+    saturation: 1,
+    hueRotate: 0,
+    sepia: 0,
+    grayscale: 0
+  };
+
+  switch (filterId) {
+    case 'vivid':
+      base.saturation = 1.8; base.contrast = 1.1; break;
+    case 'bw':
+      base.grayscale = 1; base.contrast = 1.15; break;
+    case 'sepia':
+      base.sepia = 0.8; base.contrast = 1.05; break;
+    case 'cool':
+      base.hueRotate = 180; base.saturation = 1.3; base.brightness = 1.05; break;
+    case 'warm':
+      base.sepia = 0.3; base.saturation = 1.4; base.brightness = 1.05; break;
+    case 'fade':
+      base.saturation = 0.65; base.brightness = 1.1; base.contrast = 0.88; break;
+    case 'dramatic':
+      base.contrast = 1.45; base.saturation = 1.2; base.brightness = 0.88; break;
+    case 'soft':
+      base.brightness = 1.1; base.contrast = 0.85; base.saturation = 0.9; break;
+    default:
+      break;
+  }
+
+  const adj = {
+    brightness: 1 + (adjustments.brightness || 0) / 100,
+    contrast: 1 + (adjustments.contrast || 0) / 100,
+    saturation: 1 + (adjustments.saturation || 0) / 100
+  };
+
+  return {
+    brightness: clamp(base.brightness * adj.brightness, 0, 4),
+    contrast: clamp(base.contrast * adj.contrast, 0, 4),
+    saturation: clamp(base.saturation * adj.saturation, 0, 4),
+    hueRotate: base.hueRotate || 0,
+    sepia: clamp(base.sepia || 0, 0, 1),
+    grayscale: clamp(base.grayscale || 0, 0, 1)
+  };
+}
+
+function applyPixelFilters(data, p) {
+  const br = p.brightness ?? 1;
+  const ct = p.contrast ?? 1;
+  const sat = p.saturation ?? 1;
+  const hue = (p.hueRotate ?? 0) / 360;
+  const sep = p.sepia ?? 0;
+  const grayAmt = p.grayscale ?? 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i], g = data[i + 1], b = data[i + 2];
+
+    r = ((r * br - 128) * ct) + 128;
+    g = ((g * br - 128) * ct) + 128;
+    b = ((b * br - 128) * ct) + 128;
+
+    if (grayAmt > 0) {
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      r = r + (lum - r) * grayAmt;
+      g = g + (lum - g) * grayAmt;
+      b = b + (lum - b) * grayAmt;
+    }
+
+    if (sep > 0) {
+      const sr = (r * 0.393) + (g * 0.769) + (b * 0.189);
+      const sg = (r * 0.349) + (g * 0.686) + (b * 0.168);
+      const sb = (r * 0.272) + (g * 0.534) + (b * 0.131);
+      r = r + (sr - r) * sep;
+      g = g + (sg - g) * sep;
+      b = b + (sb - b) * sep;
+    }
+
+    if (sat !== 1 || hue !== 0) {
+      const hsl = rgbToHsl(r, g, b);
+      hsl.h = (hsl.h + hue) % 1;
+      if (hsl.h < 0) hsl.h += 1;
+      hsl.s = clamp(hsl.s * sat, 0, 1);
+      const rgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+      r = rgb.r; g = rgb.g; b = rgb.b;
+    }
+
+    data[i]     = clamp8(r);
+    data[i + 1] = clamp8(g);
+    data[i + 2] = clamp8(b);
+  }
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case r: h = ((g - b) / d) % 6; break;
+      case g: h = ((b - r) / d) + 2; break;
+      default: h = ((r - g) / d) + 4; break;
+    }
+    h /= 6;
+    if (h < 0) h += 1;
+  }
+  return { h, s, l };
+}
+
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+  const m = l - c / 2;
+  let rp = 0, gp = 0, bp = 0;
+  const hp = h * 6;
+  if (hp >= 0 && hp < 1) { rp = c; gp = x; }
+  else if (hp < 2) { rp = x; gp = c; }
+  else if (hp < 3) { gp = c; bp = x; }
+  else if (hp < 4) { gp = x; bp = c; }
+  else if (hp < 5) { rp = x; bp = c; }
+  else { rp = c; bp = x; }
+  return {
+    r: (rp + m) * 255,
+    g: (gp + m) * 255,
+    b: (bp + m) * 255
+  };
+}
+
+function clamp8(v) {
+  v = Math.round(v);
+  return v < 0 ? 0 : (v > 255 ? 255 : v);
+}
+
+function clamp(v, min, max) {
+  return v < min ? min : (v > max ? max : v);
 }
 
 function drawBranding(ctx, cw, y) {
