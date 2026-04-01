@@ -304,26 +304,31 @@ function applyCameraMirror() {
 
 async function initCamera() {
   try {
+    // Stop existing stream first
     if (state.cameraStream) {
       state.cameraStream.getTracks().forEach(t => t.stop());
       state.cameraStream = null;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: state.cameraFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-    state.cameraStream = stream;
-    const video = document.getElementById('cam-video');
-    video.srcObject = stream;
-    video.style.display = 'block';
-    document.getElementById('cam-ui').style.display = 'none';
-    applyCameraMirror();
-    applyFilterToVideo();
-  } catch (e) {
-    const ui = document.getElementById('cam-ui');
-    ui.querySelector('.cam-msg').innerHTML =
-      'Camera access denied or unavailable.<br><span style="font-size:10px;opacity:.55">Using mock mode — click capture anyway.</span>';
-    ui.querySelector('.btn-enable-cam').style.display = 'none';
+    // ✅ Use state.cameraFacing here — this is likely what was missing
+    const constraints = {
+      video: {
+        facingMode: state.cameraFacing  // 'user' or 'environment'
+      },
+      audio: false
+    };
+
+    state.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    const videoEl = document.getElementById('your-video-element-id');
+    if (videoEl) {
+      videoEl.srcObject = state.cameraStream;
+      await videoEl.play();
+    }
+
+  } catch (err) {
+    console.error('Camera init failed:', err);
+    // ❌ Don't call initCamera() or flipCamera() here — that's what causes the loop
   }
 }
 
