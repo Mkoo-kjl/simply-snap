@@ -11,6 +11,7 @@ const state = {
   borderColor:      '#f5f0e8',
   stripText:        'SIMPLY SNAP',
   showDate:         true,
+  cameraFacing:     'user',
   cameraStream:     null,
   isCapturing:      false
 };
@@ -256,12 +257,13 @@ function applyFilterToVideo() {
     overlay.style.cssText = [
       'position:absolute', 'inset:0', 'width:100%', 'height:100%',
       'object-fit:cover', 'pointer-events:none', 'z-index:2',
-      'transform:scaleX(-1)'
+      'transform:none'
     ].join(';');
     const camZone = document.querySelector('.cam-zone');
     if (camZone) camZone.appendChild(overlay);
   }
   overlay.style.display = 'block';
+  applyCameraMirror();
   overlay.style.filter = filterVal || 'none';
   video.style.opacity = '0';
 
@@ -291,22 +293,49 @@ function updateShotLabel() {
   if (el) el.textContent = `SHOT ${state.currentShot + 1} OF ${state.shotCount}`;
 }
 
+function applyCameraMirror() {
+  const isFront = state.cameraFacing === 'user';
+  const mirrorTransform = isFront ? 'scaleX(-1)' : 'none';
+  const video = document.getElementById('cam-video');
+  const overlay = document.getElementById('cam-filter-overlay');
+  if (video) video.style.transform = mirrorTransform;
+  if (overlay) overlay.style.transform = mirrorTransform;
+}
+
 async function initCamera() {
   try {
+    if (state.cameraStream) {
+      state.cameraStream.getTracks().forEach(t => t.stop());
+      state.cameraStream = null;
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: { ideal: state.cameraFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     state.cameraStream = stream;
     const video = document.getElementById('cam-video');
     video.srcObject = stream;
     video.style.display = 'block';
     document.getElementById('cam-ui').style.display = 'none';
+    applyCameraMirror();
     applyFilterToVideo();
   } catch (e) {
     const ui = document.getElementById('cam-ui');
     ui.querySelector('.cam-msg').innerHTML =
       'Camera access denied or unavailable.<br><span style="font-size:10px;opacity:.55">Using mock mode — click capture anyway.</span>';
     ui.querySelector('.btn-enable-cam').style.display = 'none';
+  }
+}
+
+async function flipCamera() {
+  if (state.isCapturing) return;
+  state.cameraFacing = state.cameraFacing === 'user' ? 'environment' : 'user';
+  const btn = document.getElementById('btn-flip-cam');
+  if (btn) btn.disabled = true;
+  try {
+    await initCamera();
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -375,10 +404,14 @@ function takePhoto() {
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.filter = 'none';
-      ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-      ctx.restore();
+      if (state.cameraFacing === 'user') {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
 
       shotData = { type: 'canvas', dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
     } else {
